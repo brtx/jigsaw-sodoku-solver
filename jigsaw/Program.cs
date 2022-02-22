@@ -5,8 +5,9 @@
         static void Main()
         {
             var board = new Board();
+            var solver = new Solver(board);
 
-            board.Solve();
+            solver.Solve();
             board.Render();
             board.RenderFull();
         }

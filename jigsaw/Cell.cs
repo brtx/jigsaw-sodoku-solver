@@ -4,9 +4,19 @@ namespace jigsaw
 {
     class Cell
     {
+        public Cell(int row, int column, int sector, int? value = null)
+        {
+            Row = row;
+            Column = column;
+            Sector = sector;
+            this.value = value;
+        }
+
         private int? value;
-        public int Row { get; init; }
-        public int Column { get; init; }
+        public int Row { get; }
+        public int Column { get; }
+
+        public int Sector { get; }
 
         public int? Value
         {
@@ -18,8 +28,7 @@ namespace jigsaw
             }
         }
 
-        public bool IsInitial { get; set; }
-        public int Sector { get; init; }
+        public bool IsInitial { get; init; }
         public List<int> Options { get; } = new() { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     }
 }

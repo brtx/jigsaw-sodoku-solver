@@ -6,332 +6,32 @@ namespace jigsaw
 {
     class Board
     {
-        private bool hasChanges;
+        internal IReadOnlyCollection<Cell> Cells { get; }
 
-        private IReadOnlyCollection<Cell> Cells { get; }
-
-        public Board()
+        internal Board()
         {
             Cells = Create();
             VerifySectors();
         }
 
-        public void Solve()
-        {
-            foreach (var cell in Cells.Where(c => c.Value.HasValue).ToList())
-            {
-                UpdateAffectedCells(cell);
-            }
-
-            do
-            {
-                hasChanges = false;
-            
-                CheckForUniqueOptions();
-                CheckForOptionsMustBeInSector();
-                CheckForOptionsMustBeInRowOrColumn();
-                CheckSectorCombinations();
-            } while (hasChanges);
-        }
-
-        /// <summary>
-        /// If an option available in two sectors in exactly two columns / rows respectively,
-        /// than it cannot be present in a third sector in the same column / row.  
-        /// </summary>
-        private void CheckSectorCombinations()
-        {
-            var sectors = Cells
-                .Select(c => c.Sector)
-                .Distinct()
-                .ToList();
-
-            var sectorCombinations = (from sector1 in sectors
-                from sector2 in sectors
-                select new { sector1, sector2 }).ToList();
-
-            for (int option = 1; option <= 9; option++)
-            {
-                foreach (var sectorCombination in sectorCombinations)
-                {
-                    var sector1 = sectorCombination.sector1;
-                    var sector2 = sectorCombination.sector2;
-
-                    var sector1CellsWithOption = GetSector(sector1)
-                        .Where(c => c.Options.Contains(option))
-                        .ToList();
-
-                    var sector2CellsWithOption = GetSector(sector2)
-                        .Where(c => c.Options.Contains(option))
-                        .ToList();
-
-                    var possibleRowsSector1 = sector1CellsWithOption
-                        .Select(c => c.Row)
-                        .Distinct()
-                        .ToList();
-
-                    var possibleRowsSector2 = sector2CellsWithOption
-                        .Select(c => c.Row)
-                        .Distinct()
-                        .ToList();
-
-                    if (possibleRowsSector1.Count == 2 && possibleRowsSector2.Count == 2)
-                    {
-                        var cellsWithOptionToRemove = possibleRowsSector1
-                            .SelectMany(GetRow)
-                            .Where(c => c.Sector != sector1 && c.Sector != sector2 && c.Options.Contains(option))
-                            .ToList();
-
-                        foreach (var cellWithOptionToRemove in cellsWithOptionToRemove)
-                        {
-                            RemoveOption(cellWithOptionToRemove, option);
-                        }
-                    }
-                    
-                    var possibleColumnsSector1 = sector1CellsWithOption
-                        .Select(c => c.Column)
-                        .Distinct()
-                        .ToList();
-
-                    var possibleColumnsSector2 = sector2CellsWithOption
-                        .Select(c => c.Column)
-                        .Distinct()
-                        .ToList();
-
-                    if (possibleColumnsSector1.Count == 2 && possibleColumnsSector2.Count == 2)
-                    {
-                        var cellsWithOptionToRemove = possibleColumnsSector1
-                            .SelectMany(GetColumn)
-                            .Where(c => c.Sector != sector1 && c.Sector != sector2 && c.Options.Contains(option))
-                            .ToList();
-
-                        foreach (var cellWithOptionToRemove in cellsWithOptionToRemove)
-                        {
-                            RemoveOption(cellWithOptionToRemove, option);
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// If an option in one sector is only available in one row / column respectively,
-        /// than it cannot be available in another sector in the same row / column.
-        /// </summary>
-        private void CheckForOptionsMustBeInSector()
-        {
-            for (int option = 0; option <= 9; option++)
-            {
-                for (int sector = 1; sector <= 9; sector++)
-                {
-                    var cellsWithOption = GetSector(sector)
-                        .Where(c => c.Options.Contains(option))
-                        .ToList();
-
-                    if (cellsWithOption.Count > 1)
-                    {
-                        var cell = cellsWithOption.First();
-
-                        if (cellsWithOption.All(c => c.Row == cell.Row))
-                        {
-                            var cellsWithOptionToRemove = GetRow(cell.Row)
-                                .Where(c => c.Sector != sector && c.Options.Contains(option))
-                                .ToList();
-
-                            foreach (var cellWithOptionToRemove in cellsWithOptionToRemove)
-                            {
-                                RemoveOption(cellWithOptionToRemove, option);
-                            }
-                        }
-                        
-                        if (cellsWithOption.All(c => c.Column == cell.Column))
-                        {
-                            var cellsWithOptionToRemove = GetColumn(cell.Column)
-                                .Where(c => c.Sector != sector && c.Options.Contains(option))
-                                .ToList();
-
-                            foreach (var cellWithOptionToRemove in cellsWithOptionToRemove)
-                            {
-                                RemoveOption(cellWithOptionToRemove, option);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// If an option in a row / column respectively is only present within in one sector,
-        /// it cannot, this option can be eliminated from all other rows / columns within that sector.  
-        /// </summary>
-        private void CheckForOptionsMustBeInRowOrColumn()
-        {
-            for (int option = 0; option <= 9; option++)
-            {
-                for (int sector = 1; sector <= 9; sector++)
-                {
-                    var cellsWithOption = GetSector(sector)
-                        .Where(c => c.Options.Contains(option))
-                        .ToList();
-
-                    var rows = cellsWithOption
-                        .Select(c => c.Row)
-                        .Distinct();
-
-                    foreach (var row in rows)
-                    {
-                        if (cellsWithOption.Count(c => c.Row == row) > 1)
-                        {
-                            var cellsInRowOutsideSectorWithOption = GetRow(row)
-                                .Where(c => c.Sector != sector && c.Options.Contains(option))
-                                .ToList();
-                            
-                            if (!cellsInRowOutsideSectorWithOption.Any())
-                            {
-                                var cellsWithOptionToRemove = cellsWithOption
-                                    .Where(c => c.Row != row)
-                                    .ToList();
-
-                                foreach (var cellWithOptionToRemove in cellsWithOptionToRemove)
-                                {
-                                    RemoveOption(cellWithOptionToRemove, option);
-                                }
-                            }
-                        }
-                    }
-                    
-                    var columns = cellsWithOption
-                        .Select(c => c.Row)
-                        .Distinct();
-
-                    foreach (var column in columns)
-                    {
-                        if (cellsWithOption.Count(c => c.Column == column) > 1)
-                        {
-                            var cellsInColumnOutsideSectorWithOption = GetColumn(column)
-                                .Where(c => c.Sector != sector && c.Options.Contains(option))
-                                .ToList();
-                            
-                            if (!cellsInColumnOutsideSectorWithOption.Any())
-                            {
-                                var cellsWithOptionToRemove = cellsWithOption
-                                    .Where(c => c.Column != column)
-                                    .ToList();
-
-                                foreach (var cellWithOptionToRemove in cellsWithOptionToRemove)
-                                {
-                                    RemoveOption(cellWithOptionToRemove, option);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        private IEnumerable<Cell> GetColumn(int column)
+        internal IEnumerable<Cell> GetColumn(int column)
         {
             return Cells.Where(c => c.Column == column);
         }
 
-        private IEnumerable<Cell> GetRow(int row)
+        internal IEnumerable<Cell> GetRow(int row)
         {
             return Cells.Where(c => c.Row == row);
         }
 
-        private IEnumerable<Cell> GetSector(int sector)
+        internal IEnumerable<Cell> GetSector(int sector)
         {
             return Cells
                 .Where(c => c.Sector == sector);
         }
 
-        /// <summary>
-        /// Checks all rows / columns / sectors if only one cell is left with a specific option.  
-        /// </summary>
-        private void CheckForUniqueOptions()
-        {
-            for (int option = 0; option <= 9; option++)
-            {
-                for (int x = 1; x <= 9; x++)
-                {
-                    var cellsWithOption = Cells
-                        .Where(c => !c.Value.HasValue
-                                              && c.Row == x
-                                              && c.Options.Contains(option))
-                        .ToList();
 
-                    if (cellsWithOption.Count == 1)
-                    {
-                        var uniqueCellWithOption = cellsWithOption.Single();
-                        uniqueCellWithOption.Value = option;
-                        hasChanges = true;
-                        
-                        UpdateAffectedCells(uniqueCellWithOption);
-                    }
-                }
-                
-                for (int y = 1; y <= 9; y++)
-                {
-                    var cellsWithOption = Cells
-                        .Where(c => !c.Value.HasValue
-                                    && c.Column == y
-                                    && c.Options.Contains(option))
-                        .ToList();
 
-                    if (cellsWithOption.Count == 1)
-                    {
-                        var uniqueCellWithOption = cellsWithOption.Single();
-                        uniqueCellWithOption.Value = option;
-                        hasChanges = true;
-                        
-                        UpdateAffectedCells(uniqueCellWithOption);
-                    }
-                }
-                
-                for (int sector = 1; sector <= 9; sector++)
-                {
-                    var cellsWithOption = Cells
-                        .Where(c => !c.Value.HasValue
-                                    && c.Sector == sector
-                                    && c.Options.Contains(option))
-                        .ToList();
-
-                    if (cellsWithOption.Count == 1)
-                    {
-                        var uniqueCellWithOption = cellsWithOption.Single();
-                        uniqueCellWithOption.Value = option;
-                        hasChanges = true;
-                        
-                        UpdateAffectedCells(uniqueCellWithOption);
-                    }
-                }
-            }
-        }
-
-        private void UpdateAffectedCells(Cell cell)
-        {
-            var affectedCells = Cells
-                .Where(c => c.Row == cell.Row || c.Column == cell.Column || c.Sector == cell.Sector);
-
-            var value = cell.Value.Value;
-
-            foreach (var affectedCell in affectedCells)
-            {
-                RemoveOption(affectedCell, value);
-            }
-        }
-
-        private void RemoveOption(Cell affectedCell, int value)
-        {
-            affectedCell.Options.Remove(value);
-            hasChanges = true;
-
-            if (!affectedCell.Value.HasValue && affectedCell.Options.Count == 1)
-            {
-                affectedCell.Value = affectedCell.Options.Single();
-
-                UpdateAffectedCells(affectedCell);
-            }
-        }
 
         private void VerifySectors()
         {
@@ -349,7 +49,7 @@ namespace jigsaw
             }
         }
 
-        public void RenderFull()
+        internal void RenderFull()
         {
             Console.WriteLine("█████████████████████████████████████████████████████████████████████████");
             for (int y = 0; y < 27; y++)
@@ -407,7 +107,7 @@ namespace jigsaw
             }
         }
 
-        public void Render()
+        internal void Render()
         {
             for (int y = 1; y <= 9; y++)
             {
@@ -428,87 +128,87 @@ namespace jigsaw
         {
             return new[]
             {
-                new Cell { Row = 1, Column = 1, Sector = 1, Value = 4, IsInitial = true },
-                new Cell { Row = 2, Column = 1, Sector = 1 },
-                new Cell { Row = 3, Column = 1, Sector = 1 },
-                new Cell { Row = 4, Column = 1, Sector = 2, Value = 2, IsInitial = true },
-                new Cell { Row = 5, Column = 1, Sector = 3, Value = 7, IsInitial = true },
-                new Cell { Row = 6, Column = 1, Sector = 3 },
-                new Cell { Row = 7, Column = 1, Sector = 3 },
-                new Cell { Row = 8, Column = 1, Sector = 3 },
-                new Cell { Row = 9, Column = 1, Sector = 3 },
-                new Cell { Row = 1, Column = 2, Sector = 1 },
-                new Cell { Row = 2, Column = 2, Sector = 1 },
-                new Cell { Row = 3, Column = 2, Sector = 1 },
-                new Cell { Row = 4, Column = 2, Sector = 2 },
-                new Cell { Row = 5, Column = 2, Sector = 2, Value = 3, IsInitial = true },
-                new Cell { Row = 6, Column = 2, Sector = 2 },
-                new Cell { Row = 7, Column = 2, Sector = 3 },
-                new Cell { Row = 8, Column = 2, Sector = 4 },
-                new Cell { Row = 9, Column = 2, Sector = 3 },
-                new Cell { Row = 1, Column = 3, Sector = 1 },
-                new Cell { Row = 2, Column = 3, Sector = 5 },
-                new Cell { Row = 3, Column = 3, Sector = 2, Value = 4, IsInitial = true },
-                new Cell { Row = 4, Column = 3, Sector = 2 },
-                new Cell { Row = 5, Column = 3, Sector = 6, Value = 6, IsInitial = true },
-                new Cell { Row = 6, Column = 3, Sector = 6, Value = 2, IsInitial = true },
-                new Cell { Row = 7, Column = 3, Sector = 3, Value = 9, IsInitial = true },
-                new Cell { Row = 8, Column = 3, Sector = 4 },
-                new Cell { Row = 9, Column = 3, Sector = 4, Value = 3, IsInitial = true },
-                new Cell { Row = 1, Column = 4, Sector = 1 },
-                new Cell { Row = 2, Column = 4, Sector = 5, Value = 1, IsInitial = true },
-                new Cell { Row = 3, Column = 4, Sector = 5, Value = 8, IsInitial = true },
-                new Cell { Row = 4, Column = 4, Sector = 2, Value = 6, IsInitial = true },
-                new Cell { Row = 5, Column = 4, Sector = 6 },
-                new Cell { Row = 6, Column = 4, Sector = 7 },
-                new Cell { Row = 7, Column = 4, Sector = 3, Value = 3, IsInitial = true },
-                new Cell { Row = 8, Column = 4, Sector = 4 },
-                new Cell { Row = 9, Column = 4, Sector = 4 },
-                new Cell { Row = 1, Column = 5, Sector = 1 },
-                new Cell { Row = 2, Column = 5, Sector = 5, Value = 4, IsInitial = true },
-                new Cell { Row = 3, Column = 5, Sector = 2 },
-                new Cell { Row = 4, Column = 5, Sector = 2, Value = 8, IsInitial = true },
-                new Cell { Row = 5, Column = 5, Sector = 6 },
-                new Cell { Row = 6, Column = 5, Sector = 7, Value = 3, IsInitial = true },
-                new Cell { Row = 7, Column = 5, Sector = 4 },
-                new Cell { Row = 8, Column = 5, Sector = 4, Value = 9, IsInitial = true },
-                new Cell { Row = 9, Column = 5, Sector = 4 },
-                new Cell { Row = 1, Column = 6, Sector = 5 },
-                new Cell { Row = 2, Column = 6, Sector = 5 },
-                new Cell { Row = 3, Column = 6, Sector = 5 },
-                new Cell { Row = 4, Column = 6, Sector = 6, Value = 3, IsInitial = true },
-                new Cell { Row = 5, Column = 6, Sector = 6, Value = 1, IsInitial = true },
-                new Cell { Row = 6, Column = 6, Sector = 7, Value = 8, IsInitial = true },
-                new Cell { Row = 7, Column = 6, Sector = 7 },
-                new Cell { Row = 8, Column = 6, Sector = 9 },
-                new Cell { Row = 9, Column = 6, Sector = 4 },
-                new Cell { Row = 1, Column = 7, Sector = 8 },
-                new Cell { Row = 2, Column = 7, Sector = 8, Value = 6, IsInitial = true },
-                new Cell { Row = 3, Column = 7, Sector = 5 },
-                new Cell { Row = 4, Column = 7, Sector = 6, Value = 4, IsInitial = true },
-                new Cell { Row = 5, Column = 7, Sector = 7, Value = 2, IsInitial = true },
-                new Cell { Row = 6, Column = 7, Sector = 7 },
-                new Cell { Row = 7, Column = 7, Sector = 7 },
-                new Cell { Row = 8, Column = 7, Sector = 9 },
-                new Cell { Row = 9, Column = 7, Sector = 9 },
-                new Cell { Row = 1, Column = 8, Sector = 8 },
-                new Cell { Row = 2, Column = 8, Sector = 8 },
-                new Cell { Row = 3, Column = 8, Sector = 5 },
-                new Cell { Row = 4, Column = 8, Sector = 6 },
-                new Cell { Row = 5, Column = 8, Sector = 6 },
-                new Cell { Row = 6, Column = 8, Sector = 7 },
-                new Cell { Row = 7, Column = 8, Sector = 7 },
-                new Cell { Row = 8, Column = 8, Sector = 9 },
-                new Cell { Row = 9, Column = 8, Sector = 9 },
-                new Cell { Row = 1, Column = 9, Sector = 8 },
-                new Cell { Row = 2, Column = 9, Sector = 8 },
-                new Cell { Row = 3, Column = 9, Sector = 8, Value = 7, IsInitial = true },
-                new Cell { Row = 4, Column = 9, Sector = 8 },
-                new Cell { Row = 5, Column = 9, Sector = 8 },
-                new Cell { Row = 6, Column = 9, Sector = 9 },
-                new Cell { Row = 7, Column = 9, Sector = 9 },
-                new Cell { Row = 8, Column = 9, Sector = 9 },
-                new Cell { Row = 9, Column = 9, Sector = 9 }
+                new Cell(1, 1, 1, 4),
+                new Cell(2, 1, 1),
+                new Cell(3, 1, 1),
+                new Cell(4, 1, 2, 2),
+                new Cell(5, 1, 3, 7),
+                new Cell(6, 1, 3),
+                new Cell(7, 1, 3),
+                new Cell(8, 1, 3),
+                new Cell(9, 1, 3),
+                new Cell(1, 2, 1),
+                new Cell(2, 2, 1),
+                new Cell(3, 2, 1),
+                new Cell(4, 2, 2),
+                new Cell(5, 2, 2, 3),
+                new Cell(6, 2, 2),
+                new Cell(7, 2, 3),
+                new Cell(8, 2, 4),
+                new Cell(9, 2, 3),
+                new Cell(1, 3, 1),
+                new Cell(2, 3, 5),
+                new Cell(3, 3, 2, 4),
+                new Cell(4, 3, 2),
+                new Cell(5, 3, 6, 6),
+                new Cell(6, 3, 6, 2),
+                new Cell(7, 3, 3, 9),
+                new Cell(8, 3, 4),
+                new Cell(9, 3, 4, 3),
+                new Cell(1, 4, 1),
+                new Cell(2, 4, 5, 1),
+                new Cell(3, 4, 5, 8),
+                new Cell(4, 4, 2, 6),
+                new Cell(5, 4, 6),
+                new Cell(6, 4, 7),
+                new Cell(7, 4, 3, 3),
+                new Cell(8, 4, 4),
+                new Cell(9, 4, 4),
+                new Cell(1, 5, 1),
+                new Cell(2, 5, 5, 4),
+                new Cell(3, 5, 2),
+                new Cell(4, 5, 2, 8),
+                new Cell(5, 5, 6),
+                new Cell(6, 5, 7, 3),
+                new Cell(7, 5, 4),
+                new Cell(8, 5, 4, 9),
+                new Cell(9, 5, 4),
+                new Cell(1, 6, 5),
+                new Cell(2, 6, 5),
+                new Cell(3, 6, 5),
+                new Cell(4, 6, 6, 3),
+                new Cell(5, 6, 6, 1),
+                new Cell(6, 6, 7, 8),
+                new Cell(7, 6, 7),
+                new Cell(8, 6, 9),
+                new Cell(9, 6, 4),
+                new Cell(1, 7, 8),
+                new Cell(2, 7, 8, 6),
+                new Cell(3, 7, 5),
+                new Cell(4, 7, 6, 4),
+                new Cell(5, 7, 7, 2),
+                new Cell(6, 7, 7),
+                new Cell(7, 7, 7),
+                new Cell(8, 7, 9),
+                new Cell(9, 7, 9),
+                new Cell(1, 8, 8),
+                new Cell(2, 8, 8),
+                new Cell(3, 8, 5),
+                new Cell(4, 8, 6),
+                new Cell(5, 8, 6),
+                new Cell(6, 8, 7),
+                new Cell(7, 8, 7),
+                new Cell(8, 8, 9),
+                new Cell(9, 8, 9),
+                new Cell(1, 9, 8),
+                new Cell(2, 9, 8),
+                new Cell(3, 9, 8, 7),
+                new Cell(4, 9, 8),
+                new Cell(5, 9, 8),
+                new Cell(6, 9, 9),
+                new Cell(7, 9, 9),
+                new Cell(8, 9, 9),
+                new Cell(9, 9, 9)
             };
         }
         
@@ -516,87 +216,87 @@ namespace jigsaw
         {
             return new[]
             {
-                new Cell { Row = 1, Column = 1, Sector = 1 },
-                new Cell { Row = 2, Column = 1, Sector = 1 },
-                new Cell { Row = 3, Column = 1, Sector = 1, Value = 3, IsInitial = true },
-                new Cell { Row = 4, Column = 1, Sector = 1 },
-                new Cell { Row = 5, Column = 1, Sector = 2 },
-                new Cell { Row = 6, Column = 1, Sector = 3 },
-                new Cell { Row = 7, Column = 1, Sector = 3 },
-                new Cell { Row = 8, Column = 1, Sector = 3 },
-                new Cell { Row = 9, Column = 1, Sector = 3 },
-                new Cell { Row = 1, Column = 2, Sector = 1 },
-                new Cell { Row = 2, Column = 2, Sector = 1, Value = 6, IsInitial = true },
-                new Cell { Row = 3, Column = 2, Sector = 1, Value = 5, IsInitial = true },
-                new Cell { Row = 4, Column = 2, Sector = 2, Value = 3, IsInitial = true },
-                new Cell { Row = 5, Column = 2, Sector = 2 },
-                new Cell { Row = 6, Column = 2, Sector = 3, Value = 7, IsInitial = true },
-                new Cell { Row = 7, Column = 2, Sector = 3 },
-                new Cell { Row = 8, Column = 2, Sector = 4, Value = 1, IsInitial = true },
-                new Cell { Row = 9, Column = 2, Sector = 4, Value = 9, IsInitial = true },
-                new Cell { Row = 1, Column = 3, Sector = 1 },
-                new Cell { Row = 2, Column = 3, Sector = 1 },
-                new Cell { Row = 3, Column = 3, Sector = 2, Value = 6, IsInitial = true },
-                new Cell { Row = 4, Column = 3, Sector = 2 },
-                new Cell { Row = 5, Column = 3, Sector = 2 },
-                new Cell { Row = 6, Column = 3, Sector = 3, Value = 2, IsInitial = true },
-                new Cell { Row = 7, Column = 3, Sector = 4 },
-                new Cell { Row = 8, Column = 3, Sector = 4 },
-                new Cell { Row = 9, Column = 3, Sector = 4 },
-                new Cell { Row = 1, Column = 4, Sector = 5, Value = 1, IsInitial = true },
-                new Cell { Row = 2, Column = 4, Sector = 5 },
-                new Cell { Row = 3, Column = 4, Sector = 5 },
-                new Cell { Row = 4, Column = 4, Sector = 2 },
-                new Cell { Row = 5, Column = 4, Sector = 3 },
-                new Cell { Row = 6, Column = 4, Sector = 3, Value = 9, IsInitial = true },
-                new Cell { Row = 7, Column = 4, Sector = 4, Value = 6, IsInitial = true },
-                new Cell { Row = 8, Column = 4, Sector = 4 },
-                new Cell { Row = 9, Column = 4, Sector = 4 },
-                new Cell { Row = 1, Column = 5, Sector = 5 },
-                new Cell { Row = 2, Column = 5, Sector = 5 },
-                new Cell { Row = 3, Column = 5, Sector = 5 },
-                new Cell { Row = 4, Column = 5, Sector = 2 },
-                new Cell { Row = 5, Column = 5, Sector = 6 },
-                new Cell { Row = 6, Column = 5, Sector = 6, Value = 6, IsInitial = true },
-                new Cell { Row = 7, Column = 5, Sector = 6 },
-                new Cell { Row = 8, Column = 5, Sector = 6 },
-                new Cell { Row = 9, Column = 5, Sector = 4 },
-                new Cell { Row = 1, Column = 6, Sector = 5 },
-                new Cell { Row = 2, Column = 6, Sector = 5 },
-                new Cell { Row = 3, Column = 6, Sector = 7, Value = 7, IsInitial = true },
-                new Cell { Row = 4, Column = 6, Sector = 2, Value = 1, IsInitial = true },
-                new Cell { Row = 5, Column = 6, Sector = 6, Value = 4, IsInitial = true },
-                new Cell { Row = 6, Column = 6, Sector = 6 },
-                new Cell { Row = 7, Column = 6, Sector = 6 },
-                new Cell { Row = 8, Column = 6, Sector = 6 },
-                new Cell { Row = 9, Column = 6, Sector = 8 },
-                new Cell { Row = 1, Column = 7, Sector = 5 },
-                new Cell { Row = 2, Column = 7, Sector = 7 },
-                new Cell { Row = 3, Column = 7, Sector = 7, Value = 9, IsInitial = true },
-                new Cell { Row = 4, Column = 7, Sector = 9 },
-                new Cell { Row = 5, Column = 7, Sector = 9, Value = 8, IsInitial = true },
-                new Cell { Row = 6, Column = 7, Sector = 9 },
-                new Cell { Row = 7, Column = 7, Sector = 6 },
-                new Cell { Row = 8, Column = 7, Sector = 8, Value = 3, IsInitial = true },
-                new Cell { Row = 9, Column = 7, Sector = 8 },
-                new Cell { Row = 1, Column = 8, Sector = 7 },
-                new Cell { Row = 2, Column = 8, Sector = 7, Value = 5, IsInitial = true },
-                new Cell { Row = 3, Column = 8, Sector = 7 },
-                new Cell { Row = 4, Column = 8, Sector = 7 },
-                new Cell { Row = 5, Column = 8, Sector = 9 },
-                new Cell { Row = 6, Column = 8, Sector = 9, Value = 3, IsInitial = true },
-                new Cell { Row = 7, Column = 8, Sector = 8 },
-                new Cell { Row = 8, Column = 8, Sector = 8 },
-                new Cell { Row = 9, Column = 8, Sector = 8 },
-                new Cell { Row = 1, Column = 9, Sector = 7 },
-                new Cell { Row = 2, Column = 9, Sector = 7 },
-                new Cell { Row = 3, Column = 9, Sector = 9 },
-                new Cell { Row = 4, Column = 9, Sector = 9, Value = 9, IsInitial = true },
-                new Cell { Row = 5, Column = 9, Sector = 9 },
-                new Cell { Row = 6, Column = 9, Sector = 9 },
-                new Cell { Row = 7, Column = 9, Sector = 8, Value = 5, IsInitial = true },
-                new Cell { Row = 8, Column = 9, Sector = 8 },
-                new Cell { Row = 9, Column = 9, Sector = 8 }
+                new Cell(1, 1, 1),
+                new Cell(2, 1, 1),
+                new Cell(3, 1, 1, 3),
+                new Cell(4, 1, 1),
+                new Cell(5, 1, 2),
+                new Cell(6, 1, 3),
+                new Cell(7, 1, 3),
+                new Cell(8, 1, 3),
+                new Cell(9, 1, 3),
+                new Cell(1, 2, 1),
+                new Cell(2, 2, 1, 6),
+                new Cell(3, 2, 1, 5),
+                new Cell(4, 2, 2, 3),
+                new Cell(5, 2, 2),
+                new Cell(6, 2, 3, 7),
+                new Cell(7, 2, 3),
+                new Cell(8, 2, 4, 1),
+                new Cell(9, 2, 4, 9),
+                new Cell(1, 3, 1),
+                new Cell(2, 3, 1),
+                new Cell(3, 3, 2, 6),
+                new Cell(4, 3, 2),
+                new Cell(5, 3, 2),
+                new Cell(6, 3, 3, 2),
+                new Cell(7, 3, 4),
+                new Cell(8, 3, 4),
+                new Cell(9, 3, 4),
+                new Cell(1, 4, 5, 1),
+                new Cell(2, 4, 5),
+                new Cell(3, 4, 5),
+                new Cell(4, 4, 2),
+                new Cell(5, 4, 3),
+                new Cell(6, 4, 3, 9),
+                new Cell(7, 4, 4, 6),
+                new Cell(8, 4, 4),
+                new Cell(9, 4, 4),
+                new Cell(1, 5, 5),
+                new Cell(2, 5, 5),
+                new Cell(3, 5, 5),
+                new Cell(4, 5, 2),
+                new Cell(5, 5, 6),
+                new Cell(6, 5, 6, 6),
+                new Cell(7, 5, 6),
+                new Cell(8, 5, 6),
+                new Cell(9, 5, 4),
+                new Cell(1, 6, 5),
+                new Cell(2, 6, 5),
+                new Cell(3, 6, 7, 7),
+                new Cell(4, 6, 2, 1),
+                new Cell(5, 6, 6, 4),
+                new Cell(6, 6, 6),
+                new Cell(7, 6, 6),
+                new Cell(8, 6, 6),
+                new Cell(9, 6, 8),
+                new Cell(1, 7, 5),
+                new Cell(2, 7, 7),
+                new Cell(3, 7, 7, 9),
+                new Cell(4, 7, 9),
+                new Cell(5, 7, 9, 8),
+                new Cell(6, 7, 9),
+                new Cell(7, 7, 6),
+                new Cell(8, 7, 8, 3),
+                new Cell(9, 7, 8),
+                new Cell(1, 8, 7),
+                new Cell(2, 8, 7, 5),
+                new Cell(3, 8, 7),
+                new Cell(4, 8, 7),
+                new Cell(5, 8, 9),
+                new Cell(6, 8, 9, 3),
+                new Cell(7, 8, 8),
+                new Cell(8, 8, 8),
+                new Cell(9, 8, 8),
+                new Cell(1, 9, 7),
+                new Cell(2, 9, 7),
+                new Cell(3, 9, 9),
+                new Cell(4, 9, 9, 9),
+                new Cell(5, 9, 9),
+                new Cell(6, 9, 9),
+                new Cell(7, 9, 8, 5),
+                new Cell(8, 9, 8),
+                new Cell(9, 9, 8),
             };
         }
     }
