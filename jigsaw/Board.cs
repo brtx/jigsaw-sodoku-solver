@@ -6,12 +6,24 @@ namespace jigsaw
 {
     class Board
     {
+        private int version;
+        
         internal IReadOnlyCollection<Cell> Cells { get; }
 
         internal Board()
         {
             Cells = Create();
             VerifySectors();
+        }
+
+        internal void SetValue(Cell cell, int value)
+        {
+            cell.SetValue(value, version++);
+        }
+
+        internal void RemoveOption(Cell cell, int option)
+        {
+            cell.SetOptions(cell.Options.Where(o => o != option).ToList(), version++);
         }
 
         internal IEnumerable<Cell> GetColumn(int column)
@@ -29,10 +41,7 @@ namespace jigsaw
             return Cells
                 .Where(c => c.Sector == sector);
         }
-
-
-
-
+        
         private void VerifySectors()
         {
             if (Cells.Count != 81)
@@ -73,7 +82,7 @@ namespace jigsaw
                             : " | "
                         : " ";
 
-                    if (option == 5 && cell.Value.HasValue)
+                    if (option == 5 && cell.HasValue)
                     {
                         value = cell.Value.ToString();
                         Console.ForegroundColor = ConsoleColor.Green;
@@ -105,6 +114,8 @@ namespace jigsaw
                     Console.WriteLine();
                 }
             }
+            
+            Console.WriteLine($"Version: {version}");
         }
 
         internal void Render()
@@ -114,7 +125,7 @@ namespace jigsaw
                 for (int x = 1; x <= 9; x++)
                 {
                     var cell = Cells.Single(c => c.Row == x && c.Column == y);
-                    var value = cell.Value.HasValue
+                    var value = cell.HasValue
                         ? cell.Value.ToString()
                         : " ";
                     Console.Write($"{value} ");

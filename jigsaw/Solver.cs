@@ -14,7 +14,7 @@ namespace jigsaw
 
         internal void Solve()
         {
-            foreach (var cell in board.Cells.Where(c => c.Value.HasValue).ToList())
+            foreach (var cell in board.Cells.Where(c => c.HasValue).ToList())
             {
                 UpdateAffectedCells(cell);
             }
@@ -35,7 +35,7 @@ namespace jigsaw
             var affectedCells = board.Cells
                 .Where(c => c.Row == cell.Row || c.Column == cell.Column || c.Sector == cell.Sector);
 
-            var value = cell.Value.Value;
+            var value = cell.Value;
 
             foreach (var affectedCell in affectedCells)
             {
@@ -45,12 +45,12 @@ namespace jigsaw
         
         private void RemoveOption(Cell affectedCell, int value)
         {
-            affectedCell.Options.Remove(value);
+            board.RemoveOption(affectedCell, value);
             hasChanges = true;
 
-            if (!affectedCell.Value.HasValue && affectedCell.Options.Count == 1)
+            if (!affectedCell.HasValue && affectedCell.Options.Count == 1)
             {
-                affectedCell.Value = affectedCell.Options.Single();
+                board.SetValue(affectedCell, affectedCell.Options.Single());
 
                 UpdateAffectedCells(affectedCell);
             }
@@ -66,7 +66,7 @@ namespace jigsaw
                 for (int x = 1; x <= 9; x++)
                 {
                     var cellsWithOption = board.Cells
-                        .Where(c => !c.Value.HasValue
+                        .Where(c => !c.HasValue
                                               && c.Row == x
                                               && c.Options.Contains(option))
                         .ToList();
@@ -74,7 +74,7 @@ namespace jigsaw
                     if (cellsWithOption.Count == 1)
                     {
                         var uniqueCellWithOption = cellsWithOption.Single();
-                        uniqueCellWithOption.Value = option;
+                        board.SetValue(uniqueCellWithOption, option);
                         hasChanges = true;
                         
                         UpdateAffectedCells(uniqueCellWithOption);
@@ -84,7 +84,7 @@ namespace jigsaw
                 for (int y = 1; y <= 9; y++)
                 {
                     var cellsWithOption = board.Cells
-                        .Where(c => !c.Value.HasValue
+                        .Where(c => !c.HasValue
                                     && c.Column == y
                                     && c.Options.Contains(option))
                         .ToList();
@@ -92,7 +92,7 @@ namespace jigsaw
                     if (cellsWithOption.Count == 1)
                     {
                         var uniqueCellWithOption = cellsWithOption.Single();
-                        uniqueCellWithOption.Value = option;
+                        board.SetValue(uniqueCellWithOption, option);
                         hasChanges = true;
                         
                         UpdateAffectedCells(uniqueCellWithOption);
@@ -102,7 +102,7 @@ namespace jigsaw
                 for (int sector = 1; sector <= 9; sector++)
                 {
                     var cellsWithOption = board.Cells
-                        .Where(c => !c.Value.HasValue
+                        .Where(c => !c.HasValue
                                     && c.Sector == sector
                                     && c.Options.Contains(option))
                         .ToList();
@@ -110,7 +110,7 @@ namespace jigsaw
                     if (cellsWithOption.Count == 1)
                     {
                         var uniqueCellWithOption = cellsWithOption.Single();
-                        uniqueCellWithOption.Value = option;
+                        board.SetValue(uniqueCellWithOption, option);
                         hasChanges = true;
                         
                         UpdateAffectedCells(uniqueCellWithOption);
