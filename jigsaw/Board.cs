@@ -18,6 +18,24 @@ namespace jigsaw
 
         internal void SetValue(Cell cell, int value)
         {
+            if (GetRow(cell.Row).Any(c => c.HasValue && c.Value == value))
+            {
+                RenderFull();
+                throw new ApplicationException();
+            }
+            
+            if (GetColumn(cell.Column).Any(c => c.HasValue && c.Value == value))
+            {
+                RenderFull();
+                throw new ApplicationException();
+            }
+            
+            if (GetSector(cell.Sector).Any(c => c.HasValue && c.Value == value))
+            {
+                RenderFull();
+                throw new ApplicationException();
+            }
+            
             cell.SetValue(value, version++);
         }
 

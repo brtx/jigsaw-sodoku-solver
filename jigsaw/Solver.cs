@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 
 namespace jigsaw
@@ -247,6 +248,7 @@ namespace jigsaw
 
             var sectorCombinations = (from sector1 in sectors
                 from sector2 in sectors
+                where sector1 != sector2
                 select new { sector1, sector2 }).ToList();
 
             for (int option = 1; option <= 9; option++)
@@ -274,7 +276,7 @@ namespace jigsaw
                         .Distinct()
                         .ToList();
 
-                    if (possibleRowsSector1.Count == 2 && possibleRowsSector2.Count == 2)
+                    if (possibleRowsSector1.Count == 2 && possibleRowsSector2.Count == 2 && new HashSet<int>(possibleRowsSector1).SetEquals(possibleRowsSector2))
                     {
                         var cellsWithOptionToRemove = possibleRowsSector1
                             .SelectMany(board.GetRow)
@@ -297,13 +299,13 @@ namespace jigsaw
                         .Distinct()
                         .ToList();
 
-                    if (possibleColumnsSector1.Count == 2 && possibleColumnsSector2.Count == 2)
+                    if (possibleColumnsSector1.Count == 2 && possibleColumnsSector2.Count == 2 && new HashSet<int>(possibleColumnsSector1).SetEquals(possibleColumnsSector2))
                     {
                         var cellsWithOptionToRemove = possibleColumnsSector1
                             .SelectMany(board.GetColumn)
                             .Where(c => c.Sector != sector1 && c.Sector != sector2 && c.Options.Contains(option))
                             .ToList();
-
+                    
                         foreach (var cellWithOptionToRemove in cellsWithOptionToRemove)
                         {
                             RemoveOption(cellWithOptionToRemove, option);
